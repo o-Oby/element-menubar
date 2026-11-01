@@ -328,7 +328,9 @@ export async function runUpdate(options: UpdateOptions): Promise<string> {
         git(repository, "worktree", "remove", candidate);
         fs.rmdirSync(workspaceRoot);
         git(repository, "branch", "-d", candidateBranch);
-        log(`Prêt : ${destination}\nQuittez Element Menu Bar, puis installez le DMG. Votre profil sera conservé.`);
+        log(
+            `Prêt : ${destination}\nQuittez Element, sauvegardez l’application et le profil, puis remplacez /Applications/Element.app depuis le DMG.`,
+        );
         showDelivery(destination);
         return destination;
     } catch (error) {

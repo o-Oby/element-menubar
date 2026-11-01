@@ -1,8 +1,9 @@
 {
-    "appId": "io.github.o-oby.element-menubar",
+    "appId": "im.riot.app",
     "name": "element-menubar",
-    "productName": "Element Menu Bar",
+    "productName": "Element",
     "description": "Element Desktop avec barre de menus macOS — fork personnel",
-    "protocols": ["io.github.o-oby.element-menubar"],
-    "manualUpdates": true
+    "protocols": ["io.element.desktop", "element"],
+    "manualUpdates": true,
+    "registerLegacyProtocol": true
 }

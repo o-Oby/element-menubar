@@ -39,6 +39,7 @@ beforeEach(() => {
         appId: "test",
         protocol: "test",
         windowsCertSubjectName: undefined,
+        registerLegacyProtocol: true,
     });
 });
 
@@ -154,6 +155,7 @@ describe("loadConfig", () => {
                 appId: "test",
                 protocol: "test",
                 windowsCertSubjectName: undefined,
+                registerLegacyProtocol: true,
             });
             vol.fromJSON({
                 "/home/custom-config.json": JSON.stringify({

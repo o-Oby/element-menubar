@@ -39,6 +39,7 @@ describe("getBuildConfig", () => {
         expect(config.protocol).toBe("proto");
         expect(config.windowsCertSubjectName).toBe("subject.name");
         expect(config.manualUpdates).toBe(false);
+        expect(config.registerLegacyProtocol).toBe(true);
     });
 
     it.each([true, false, "true", undefined])(
@@ -49,6 +50,28 @@ describe("getBuildConfig", () => {
             expect(getBuildConfig().manualUpdates).toBe(value === true);
         },
     );
+
+    it.each([
+        [false, undefined, true],
+        [true, undefined, false],
+        [true, true, true],
+        [false, false, false],
+        [true, "true", false],
+        [false, "false", true],
+    ])("should resolve legacy protocol policy independently (%s, %s)", async (manual, override, expected) => {
+        vol.fromJSON(
+            {
+                "../package.json": JSON.stringify({
+                    electron_manual_updates: manual,
+                    electron_register_legacy_protocol: override,
+                }),
+            },
+            __dirname,
+        );
+        const { getBuildConfig } = await import("./build-config.js");
+        expect(getBuildConfig().registerLegacyProtocol).toBe(expected);
+        expect(getBuildConfig().manualUpdates).toBe(manual);
+    });
 
     it("should keep the packaged policy cached for the lifetime of the process", async () => {
         vol.fromJSON({ "../package.json": JSON.stringify({ electron_manual_updates: true }) }, __dirname);

@@ -58,8 +58,8 @@ export default class ProtocolHandler {
         const args = getArgsForProtocolRegistration(parsedArgs);
         if (app.isPackaged) {
             app.setAsDefaultProtocolClient(this.protocol, process.execPath, args);
-            // The personal fork must not replace the official app's legacy URL handler.
-            if (!getBuildConfig().manualUpdates)
+            // Replacement builds retain legacy links; separate personal builds leave them alone.
+            if (getBuildConfig().registerLegacyProtocol)
                 app.setAsDefaultProtocolClient(LEGACY_PROTOCOL, process.execPath, args);
         } else if (process.platform === "win32") {
             // on Mac/Linux this would just cause the electron binary to open

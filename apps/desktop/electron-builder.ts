@@ -54,6 +54,7 @@ interface ExtraMetadata extends Metadata {
     electron_appId: string;
     electron_protocol: string;
     electron_manual_updates?: boolean;
+    electron_register_legacy_protocol?: boolean;
     electron_windows_cert_sn?: string;
 }
 
@@ -66,6 +67,7 @@ interface Variant extends Metadata {
     "linux.deb.name"?: string;
     "protocols": string[];
     "manualUpdates"?: boolean;
+    "registerLegacyProtocol"?: boolean;
 }
 
 type Writable<T> = NonNullable<
@@ -142,6 +144,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         electron_appId: variant.appId,
         electron_protocol: variant.protocols[0],
         electron_manual_updates: variant.manualUpdates === true,
+        electron_register_legacy_protocol: variant.registerLegacyProtocol,
     },
     linux: {
         target: ["tar.gz", "deb"],

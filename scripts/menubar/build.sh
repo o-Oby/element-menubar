@@ -66,7 +66,8 @@ node --input-type=module - "$prepare_dir/config/config.json" <<'NODE'
 import fs from "node:fs";
 const config = JSON.parse(fs.readFileSync("apps/desktop/element.io/release/config.json", "utf8"));
 delete config.update_base_url;
-config.brand = "Element Menu Bar";
+const variant = JSON.parse(fs.readFileSync("menubar/build.json", "utf8"));
+config.brand = variant.productName;
 fs.writeFileSync(process.argv[2], JSON.stringify(config, null, 4) + "\n");
 NODE
 (cd apps/desktop && pnpm run fetch --packages "$cache_dir/packages" --deploys "$prepare_dir/deploys" --cfgdir "$prepare_dir/config")

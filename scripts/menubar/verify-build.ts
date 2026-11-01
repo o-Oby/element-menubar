@@ -16,20 +16,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const requireDesktop = createRequire(path.join(root, "apps/desktop/package.json"));
 const asar = requireDesktop("@electron/asar") as { extractFile(archive: string, file: string): Buffer };
 const dist = path.join(root, "apps/desktop/dist");
-const app = path.join(dist, "mac-arm64/Element Menu Bar.app");
+const variant = JSON.parse(fs.readFileSync(path.join(root, "menubar/build.json"), "utf8"));
+const app = path.join(dist, "mac-arm64", `${variant.productName}.app`);
 const resources = path.join(app, "Contents/Resources");
 const metadata = JSON.parse(asar.extractFile(path.join(resources, "app.asar"), "package.json").toString());
 const config = JSON.parse(asar.extractFile(path.join(resources, "webapp.asar"), "config.json").toString());
 const webVersion = asar.extractFile(path.join(resources, "webapp.asar"), "version").toString().trim();
 const release = JSON.parse(fs.readFileSync(path.join(root, "menubar/release.json"), "utf8"));
-assert.equal(metadata.productName, "Element Menu Bar");
-assert.equal(metadata.name, "element-menubar");
-assert.equal(metadata.electron_appId, "io.github.o-oby.element-menubar");
-assert.equal(metadata.electron_protocol, "io.github.o-oby.element-menubar");
+assert.equal(metadata.productName, variant.productName);
+assert.equal(metadata.name, variant.name);
+assert.equal(metadata.electron_appId, variant.appId);
+assert.equal(metadata.electron_protocol, variant.protocols[0]);
+assert.equal(metadata.electron_register_legacy_protocol, variant.registerLegacyProtocol);
 assert.equal(metadata.electron_manual_updates, true);
 assert.equal(metadata.version, release.upstreamTag.slice(1));
 assert.equal(webVersion.replace(/^v/, ""), metadata.version);
-assert.equal(config.brand, "Element Menu Bar");
+assert.equal(config.brand, variant.productName);
 assert.equal(config.update_base_url, undefined);
 for (const image of ["menubarTemplate.png", "menubarTemplate@2x.png"]) {
     assert.ok(fs.statSync(path.join(resources, "build", image)).size > 0);
@@ -40,6 +42,16 @@ const bundleId = execFileSync(
     { encoding: "utf8" },
 ).trim();
 assert.equal(bundleId, metadata.electron_appId);
+const urlTypes = JSON.parse(
+    execFileSync(
+        "/usr/bin/plutil",
+        ["-extract", "CFBundleURLTypes", "json", "-o", "-", path.join(app, "Contents/Info.plist")],
+        {
+            encoding: "utf8",
+        },
+    ),
+) as { CFBundleURLSchemes: string[] }[];
+assert.deepEqual(urlTypes.flatMap((entry) => entry.CFBundleURLSchemes).sort(), [...variant.protocols].sort());
 execFileSync("codesign", ["--verify", "--deep", "--strict", app], { stdio: "inherit" });
 const dmgName = `Element-Menu-Bar-${metadata.version}-r${release.revision}-arm64.dmg`;
 const dmg = path.join(dist, dmgName);

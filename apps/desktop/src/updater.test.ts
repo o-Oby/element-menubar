@@ -40,6 +40,7 @@ function setManualUpdates(manualUpdates: boolean): void {
         appId: "io.github.o-oby.element-menubar",
         protocol: "element-menubar",
         windowsCertSubjectName: undefined,
+        registerLegacyProtocol: true,
     });
 }
 

@@ -18,6 +18,8 @@ let buildConfig: BuildConfig;
 interface BuildConfig {
     // Immutable package policy: this variant is updated by rebuilding the fork.
     manualUpdates: boolean;
+    // Replacement builds can retain existing element:// links without enabling automatic updates.
+    registerLegacyProtocol: boolean;
     // Application User Model ID
     appId: string;
     // Protocol string used for OIDC callbacks
@@ -30,8 +32,12 @@ interface BuildConfig {
 export function getBuildConfig(): BuildConfig {
     if (!buildConfig) {
         const packageJson = loadJsonFile(path.join(__dirname, "..", "package.json")) as JsonObject;
+        const manualUpdates = packageJson["electron_manual_updates"] === true;
+        const registerLegacyProtocol = packageJson["electron_register_legacy_protocol"];
         buildConfig = {
-            manualUpdates: packageJson["electron_manual_updates"] === true,
+            manualUpdates,
+            registerLegacyProtocol:
+                typeof registerLegacyProtocol === "boolean" ? registerLegacyProtocol : !manualUpdates,
             appId: (packageJson["electron_appId"] as string) || "im.riot.app",
             protocol: (packageJson["electron_protocol"] as string) || "io.element.desktop",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,

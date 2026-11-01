@@ -48,6 +48,7 @@ beforeEach(() => {
         protocol: TEST_PROTOCOL,
         windowsCertSubjectName: undefined,
         manualUpdates: false,
+        registerLegacyProtocol: true,
     });
     // Reset the state of the in-memory fs
     vol.reset();
@@ -167,8 +168,12 @@ describe("ProtocolHandler", () => {
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("element", "/bin/element-desktop", args);
         });
 
-        it("does not register the official legacy handler for the personal fork", () => {
-            vi.mocked(getBuildConfig).mockReturnValue({ ...getBuildConfig(), manualUpdates: true });
+        it("does not register the official legacy handler for a separate personal fork", () => {
+            vi.mocked(getBuildConfig).mockReturnValue({
+                ...getBuildConfig(),
+                manualUpdates: true,
+                registerLegacyProtocol: false,
+            });
             const handler = new ProtocolHandler(TEST_PROTOCOL);
             handler.initialise({
                 userDataPath: USER_DATA_DIR,
@@ -179,6 +184,30 @@ describe("ProtocolHandler", () => {
             });
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledTimes(1);
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(TEST_PROTOCOL, "/bin/element-desktop", [
+                "--no-update",
+            ]);
+        });
+
+        it("registers the original callback and legacy links for a manual-update replacement", () => {
+            vi.mocked(getBuildConfig).mockReturnValue({
+                ...getBuildConfig(),
+                protocol: "io.element.desktop",
+                manualUpdates: true,
+                registerLegacyProtocol: true,
+            });
+            const handler = new ProtocolHandler("io.element.desktop");
+            handler.initialise({
+                userDataPath: USER_DATA_DIR,
+                devtools: false,
+                update: false,
+                hidden: false,
+                positional: [],
+            });
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledTimes(2);
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("io.element.desktop", "/bin/element-desktop", [
+                "--no-update",
+            ]);
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("element", "/bin/element-desktop", [
                 "--no-update",
             ]);
         });
