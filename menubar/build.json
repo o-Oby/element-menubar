@@ -1,0 +1,8 @@
+{
+    "appId": "io.github.o-oby.element-menubar",
+    "name": "element-menubar",
+    "productName": "Element Menu Bar",
+    "description": "Element Desktop avec barre de menus macOS — fork personnel",
+    "protocols": ["io.github.o-oby.element-menubar"],
+    "manualUpdates": true
+}

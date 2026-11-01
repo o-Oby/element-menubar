@@ -53,6 +53,7 @@ interface ExtraMetadata extends Metadata {
     desktopName: string;
     electron_appId: string;
     electron_protocol: string;
+    electron_manual_updates?: boolean;
     electron_windows_cert_sn?: string;
 }
 
@@ -64,6 +65,7 @@ interface Variant extends Metadata {
     "linux.executableName"?: string;
     "linux.deb.name"?: string;
     "protocols": string[];
+    "manualUpdates"?: boolean;
 }
 
 type Writable<T> = NonNullable<
@@ -128,7 +130,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         enableEmbeddedAsarIntegrityValidation: true,
     },
     files: ["package.json", "lib/**"],
-    extraResources: ["build/icon.*", "webapp.asar"],
+    extraResources: ["build/icon.*", "build/menubar*.png", "webapp.asar"],
     extraMetadata: {
         name: variant.name,
         productName: variant.productName,
@@ -139,6 +141,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         desktopName: `${variant.name}.desktop`,
         electron_appId: variant.appId,
         electron_protocol: variant.protocols[0],
+        electron_manual_updates: variant.manualUpdates === true,
     },
     linux: {
         target: ["tar.gz", "deb"],
@@ -295,6 +298,15 @@ if (typeof log !== "undefined") {
         }
         return prevTransform?.(message, level) ?? message;
     };
+}
+
+// Personal builds are deliberately independent of Element's signed update channel.
+if (variant.manualUpdates) {
+    config.mac.identity = "-";
+    config.mac.notarize = false;
+    config.mac.gatekeeperAssess = false;
+    config.dmg = { ...config.dmg, sign: false };
+    config.artifactName = `Element-Menu-Bar-${process.env.VERSION ?? "${version}"}-r${process.env.MENUBAR_REVISION ?? "1"}-\${arch}.\${ext}`;
 }
 
 export default config;
