@@ -73,7 +73,7 @@ NODE
 # Explicit build commands avoid Nx reusing a package produced for another variant.
 pnpm --dir apps/desktop exec tsc
 (cd apps/desktop && node scripts/copy-res.ts)
-pnpm --dir apps/desktop exec playwright test playwright/e2e/launch/menubar.spec.ts --retries=0
+pnpm --dir apps/desktop exec playwright test playwright/e2e/launch/menubar.spec.ts --retries=0 --reporter=line
 pnpm --dir apps/desktop exec electron-builder --mac dmg --arm64 --publish never
 node scripts/menubar/verify-build.ts
 rm -rf "$prepare_dir"
