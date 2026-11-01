@@ -6,7 +6,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import { expect, describe, it, vi, beforeEach } from "vitest";
-import { type Menu, type MenuItemConstructorOptions, shell } from "electron";
+import { type KeyboardEvent, type Menu, type MenuItemConstructorOptions, shell } from "electron";
 
 import { type buildMenuTemplate as _buildMenuTemplate } from "./vectormenu.js";
 import { type ConfigOptions } from "./config.js";
