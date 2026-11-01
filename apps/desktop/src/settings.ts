@@ -49,10 +49,6 @@ const Settings: Record<string, Setting> = {
         },
     },
     "Electron.showTrayIcon": {
-        // Things other than Mac support tray icons
-        supported(): boolean {
-            return process.platform !== "darwin";
-        },
         async read(): Promise<any> {
             return tray.hasTray();
         },
@@ -61,7 +57,7 @@ const Settings: Record<string, Setting> = {
                 // Create trayIcon icon
                 await tray.create();
             } else {
-                tray.destroy();
+                await tray.destroy();
             }
             Store.instance?.set("minimizeToTray", value);
         },

@@ -12,6 +12,7 @@ import { randomArray } from "./utils.js";
 import { consumeDisplayMediaCallback } from "./displayMediaCallback.js";
 import Store, { clearData } from "./store.js";
 import { getConfig } from "./config.js";
+import { revealMainWindow } from "./window-close.js";
 
 let focusHandlerAttached = false;
 ipcMain.on("loudNotification", function (): void {
@@ -65,12 +66,7 @@ ipcMain.on("ipcCall", async function (_ev: IpcMainEvent, payload) {
             ret = app.getVersion();
             break;
         case "focusWindow":
-            if (global.mainWindow.isMinimized()) {
-                global.mainWindow.restore();
-            } else {
-                global.mainWindow.show();
-                global.mainWindow.focus();
-            }
+            await revealMainWindow(global.mainWindow);
             break;
 
         case "navigateBack":

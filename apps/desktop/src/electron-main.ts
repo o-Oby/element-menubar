@@ -33,6 +33,7 @@ import "./settings.js";
 import "./badge.js";
 import "./x509.js";
 import * as tray from "./tray.js";
+import { backgroundToMenuBar, stopDockUpdates } from "./macos-dock.js";
 import Store from "./store.js";
 import { buildMenuTemplate } from "./vectormenu.js";
 import webContentsHandler from "./webcontents-handler.js";
@@ -296,17 +297,25 @@ app.on("ready", async () => {
     global.mainWindow.webContents.session.setSpellCheckerEnabled(store.get("spellCheckerEnabled", true));
 
     // Create trayIcon icon
-    if (store.get("minimizeToTray")) await tray.create();
+    if (store.get("minimizeToTray")) {
+        try {
+            await tray.create();
+        } catch (error) {
+            // A broken/missing menu bar icon must leave the normal Dock available.
+            console.error("Failed to create the tray icon", error);
+        }
+    }
 
     global.mainWindow.once("ready-to-show", () => {
         if (!global.mainWindow) return;
         mainWindowState.manage(global.mainWindow);
 
         if (!args.hidden) {
-            global.mainWindow.show();
+            void revealMainWindow(global.mainWindow);
         } else {
             // hide here explicitly because window manage above sometimes shows it
             global.mainWindow.hide();
+            backgroundToMenuBar();
         }
     });
 
@@ -406,11 +415,12 @@ app.on("activate", () => {
     // than an inline reload) so a relaunch can't re-arm a crash loop we've already given up on; it is a
     // no-op when the renderer is healthy.
     rendererRecovery?.recoverIfCrashed();
-    global.mainWindow?.show();
+    if (global.mainWindow) void revealMainWindow(global.mainWindow);
 });
 
 function beforeQuit(): void {
     global.appQuitting = true;
+    stopDockUpdates();
     global.mainWindow?.webContents.send("before-quit");
 }
 
@@ -427,7 +437,7 @@ app.on("second-instance", (ev, commandLine, workingDirectory) => {
         // brought to a working UI rather than a white screen. Routed through the capped recovery so a
         // relaunch can't re-arm a crash loop we've already given up on; a no-op for a healthy window.
         rendererRecovery?.recoverIfCrashed();
-        revealMainWindow(global.mainWindow);
+        void revealMainWindow(global.mainWindow);
     }
 });
 

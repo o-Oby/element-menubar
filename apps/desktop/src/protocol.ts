@@ -13,6 +13,8 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 
 import { type Args, getArgsForProtocolRegistration } from "./args.js";
+import { revealMainWindow } from "./window-close.js";
+import { getBuildConfig } from "./build-config.js";
 
 const LEGACY_PROTOCOL = "element";
 const SEARCH_PARAM = "element-desktop-ssoid";
@@ -30,7 +32,7 @@ export default class ProtocolHandler {
             // Protocol handler for macos
             app.on("open-url", (ev, url) => {
                 ev.preventDefault();
-                this.handleDeeplink(url);
+                if (this.handleDeeplink(url) && global.mainWindow) void revealMainWindow(global.mainWindow);
             });
         } else {
             // Protocol handler for win32/Linux
@@ -56,7 +58,9 @@ export default class ProtocolHandler {
         const args = getArgsForProtocolRegistration(parsedArgs);
         if (app.isPackaged) {
             app.setAsDefaultProtocolClient(this.protocol, process.execPath, args);
-            app.setAsDefaultProtocolClient(LEGACY_PROTOCOL, process.execPath, args);
+            // The personal fork must not replace the official app's legacy URL handler.
+            if (!getBuildConfig().manualUpdates)
+                app.setAsDefaultProtocolClient(LEGACY_PROTOCOL, process.execPath, args);
         } else if (process.platform === "win32") {
             // on Mac/Linux this would just cause the electron binary to open
             // special handler for running without being packaged, e.g `electron .` by passing our app path to electron

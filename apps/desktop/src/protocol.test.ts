@@ -11,6 +11,11 @@ import EventEmitter from "node:events";
 import { app } from "electron";
 
 import ProtocolHandler from "./protocol.js";
+import { getBuildConfig } from "./build-config.js";
+import { revealMainWindow } from "./window-close.js";
+
+vi.mock("./build-config.js");
+vi.mock("./window-close.js");
 
 const TEST_PROTOCOL = "test.proto";
 const TEST_SESSION_ID = "test_session_id";
@@ -37,6 +42,13 @@ vi.mock("electron", () => {
 });
 
 beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getBuildConfig).mockReturnValue({
+        appId: "test.app",
+        protocol: TEST_PROTOCOL,
+        windowsCertSubjectName: undefined,
+        manualUpdates: false,
+    });
     // Reset the state of the in-memory fs
     vol.reset();
     // Clear the event emitter
@@ -117,6 +129,7 @@ describe("ProtocolHandler", () => {
         }
 
         expect(global.mainWindow!.loadURL).toHaveBeenCalledWith(expectedUri);
+        if (platform === "darwin") expect(revealMainWindow).toHaveBeenCalledWith(global.mainWindow);
     });
 
     it("should safely deal with wrong protocol deeplinks", () => {
@@ -131,6 +144,7 @@ describe("ProtocolHandler", () => {
         app.emit("open-url", new Event("test"), "random.proto:/#/room/#matrix:matrix.org");
 
         expect(global.mainWindow!.loadURL).not.toHaveBeenCalled();
+        expect(revealMainWindow).not.toHaveBeenCalled();
     });
 
     describe("initialise", () => {
@@ -151,6 +165,22 @@ describe("ProtocolHandler", () => {
             const args = ["--no-update"];
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(TEST_PROTOCOL, "/bin/element-desktop", args);
             expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith("element", "/bin/element-desktop", args);
+        });
+
+        it("does not register the official legacy handler for the personal fork", () => {
+            vi.mocked(getBuildConfig).mockReturnValue({ ...getBuildConfig(), manualUpdates: true });
+            const handler = new ProtocolHandler(TEST_PROTOCOL);
+            handler.initialise({
+                userDataPath: USER_DATA_DIR,
+                devtools: false,
+                update: false,
+                hidden: false,
+                positional: [],
+            });
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledTimes(1);
+            expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith(TEST_PROTOCOL, "/bin/element-desktop", [
+                "--no-update",
+            ]);
         });
 
         it("should handle deeplink", () => {

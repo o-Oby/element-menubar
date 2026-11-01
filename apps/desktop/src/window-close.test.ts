@@ -10,6 +10,9 @@ import { app } from "electron";
 import type { BrowserWindow, Event } from "electron";
 
 import { handleWindowClose, revealMainWindow } from "./window-close.js";
+import { backgroundToMenuBar, restoreDock } from "./macos-dock.js";
+
+vi.mock("./macos-dock.js");
 
 vi.mock("electron", () => ({
     app: {
@@ -29,6 +32,7 @@ function mockWindow(overrides: Partial<Record<keyof BrowserWindow, unknown>> = {
         isFullScreen: vi.fn().mockReturnValue(false),
         isVisible: vi.fn().mockReturnValue(true),
         isMinimized: vi.fn().mockReturnValue(false),
+        isDestroyed: vi.fn().mockReturnValue(false),
         ...overrides,
     } as unknown as BrowserWindow;
 }
@@ -48,6 +52,8 @@ function usePlatform(platform: NodeJS.Platform): void {
 
 describe("handleWindowClose", () => {
     beforeEach(() => {
+        global.appQuitting = false;
+        vi.clearAllMocks();
         vi.mocked(app.hide).mockClear();
         vi.mocked(app.show).mockClear();
     });
@@ -56,7 +62,7 @@ describe("handleWindowClose", () => {
         vi.restoreAllMocks();
     });
 
-    it("hides the whole app on macOS without a tray (#32267)", () => {
+    it("hides the whole app on macOS without a tray (#32267)", async () => {
         usePlatform("darwin");
         const window = mockWindow();
         const event = mockEvent();
@@ -68,17 +74,18 @@ describe("handleWindowClose", () => {
         expect(window.hide).not.toHaveBeenCalled();
     });
 
-    it("hides the whole app on macOS even when a tray is present", () => {
+    it("hides the whole app on macOS even when a tray is present", async () => {
         usePlatform("darwin");
         const window = mockWindow();
 
         handleWindowClose(mockEvent(), window, { appQuitting: false, hasTray: true });
 
         expect(app.hide).toHaveBeenCalled();
+        expect(backgroundToMenuBar).toHaveBeenCalled();
         expect(window.hide).not.toHaveBeenCalled();
     });
 
-    it("hides only the window on Linux with a tray", () => {
+    it("hides only the window on Linux with a tray", async () => {
         usePlatform("linux");
         const window = mockWindow();
         const event = mockEvent();
@@ -90,7 +97,7 @@ describe("handleWindowClose", () => {
         expect(app.hide).not.toHaveBeenCalled();
     });
 
-    it("hides only the window on Windows with a tray", () => {
+    it("hides only the window on Windows with a tray", async () => {
         usePlatform("win32");
         const window = mockWindow();
 
@@ -100,7 +107,7 @@ describe("handleWindowClose", () => {
         expect(app.hide).not.toHaveBeenCalled();
     });
 
-    it("lets the window close on Linux without a tray", () => {
+    it("lets the window close on Linux without a tray", async () => {
         usePlatform("linux");
         const window = mockWindow();
         const event = mockEvent();
@@ -112,7 +119,7 @@ describe("handleWindowClose", () => {
         expect(app.hide).not.toHaveBeenCalled();
     });
 
-    it("lets the window close on Windows without a tray", () => {
+    it("lets the window close on Windows without a tray", async () => {
         usePlatform("win32");
         const window = mockWindow();
         const event = mockEvent();
@@ -123,7 +130,7 @@ describe("handleWindowClose", () => {
         expect(window.hide).not.toHaveBeenCalled();
     });
 
-    it("lets the window close on macOS once a real quit is under way", () => {
+    it("lets the window close on macOS once a real quit is under way", async () => {
         usePlatform("darwin");
         const window = mockWindow();
         const event = mockEvent();
@@ -134,7 +141,7 @@ describe("handleWindowClose", () => {
         expect(app.hide).not.toHaveBeenCalled();
     });
 
-    it("lets the window close on a quit that beats a tray", () => {
+    it("lets the window close on a quit that beats a tray", async () => {
         usePlatform("linux");
         const window = mockWindow();
         const event = mockEvent();
@@ -145,7 +152,7 @@ describe("handleWindowClose", () => {
         expect(window.hide).not.toHaveBeenCalled();
     });
 
-    it("leaves fullscreen before hiding the app on macOS", () => {
+    it("leaves fullscreen before hiding the app on macOS", async () => {
         usePlatform("darwin");
         const window = mockWindow({ isFullScreen: vi.fn().mockReturnValue(true) });
 
@@ -159,7 +166,7 @@ describe("handleWindowClose", () => {
         expect(app.hide).toHaveBeenCalled();
     });
 
-    it("leaves fullscreen before hiding the window on a tray platform", () => {
+    it("leaves fullscreen before hiding the window on a tray platform", async () => {
         usePlatform("linux");
         const window = mockWindow({ isFullScreen: vi.fn().mockReturnValue(true) });
 
@@ -172,7 +179,7 @@ describe("handleWindowClose", () => {
         expect(window.hide).toHaveBeenCalled();
     });
 
-    it("still hides the app on macOS when the window has already gone away", () => {
+    it("still hides the app on macOS when the window has already gone away", async () => {
         usePlatform("darwin");
 
         expect(() => handleWindowClose(mockEvent(), null, { appQuitting: false, hasTray: false })).not.toThrow();
@@ -182,6 +189,8 @@ describe("handleWindowClose", () => {
 
 describe("revealMainWindow", () => {
     beforeEach(() => {
+        global.appQuitting = false;
+        vi.clearAllMocks();
         vi.mocked(app.show).mockClear();
     });
 
@@ -189,52 +198,92 @@ describe("revealMainWindow", () => {
         vi.restoreAllMocks();
     });
 
-    it("un-hides the app on macOS, which app.hide() left invisible to isVisible()", () => {
+    it("un-hides the app on macOS, which app.hide() left invisible to isVisible()", async () => {
         usePlatform("darwin");
         const window = mockWindow();
 
-        revealMainWindow(window);
+        await revealMainWindow(window);
 
         expect(app.show).toHaveBeenCalled();
         expect(window.focus).toHaveBeenCalled();
     });
 
-    it("does not touch the application elsewhere", () => {
+    it("does not touch the application elsewhere", async () => {
         usePlatform("linux");
         const window = mockWindow();
 
-        revealMainWindow(window);
+        await revealMainWindow(window);
 
         expect(app.show).not.toHaveBeenCalled();
         expect(window.focus).toHaveBeenCalled();
     });
 
-    it("shows a hidden window", () => {
+    it("shows a hidden window", async () => {
         usePlatform("linux");
         const window = mockWindow({ isVisible: vi.fn().mockReturnValue(false) });
 
-        revealMainWindow(window);
+        await revealMainWindow(window);
 
         expect(window.show).toHaveBeenCalled();
     });
 
-    it("leaves an already visible window alone", () => {
+    it("leaves an already visible window alone", async () => {
         usePlatform("linux");
         const window = mockWindow();
 
-        revealMainWindow(window);
+        await revealMainWindow(window);
 
         expect(window.show).not.toHaveBeenCalled();
         expect(window.restore).not.toHaveBeenCalled();
     });
 
-    it("restores a minimised window", () => {
+    it("restores a minimised window", async () => {
         usePlatform("linux");
         const window = mockWindow({ isMinimized: vi.fn().mockReturnValue(true) });
 
-        revealMainWindow(window);
+        await revealMainWindow(window);
 
         expect(window.restore).toHaveBeenCalled();
         expect(window.focus).toHaveBeenCalled();
+    });
+});
+
+describe("close and reopen races", () => {
+    beforeEach(() => {
+        global.appQuitting = false;
+        vi.clearAllMocks();
+        usePlatform("darwin");
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("cancels a fullscreen close when the user reopens the window", async () => {
+        const window = mockWindow({ isFullScreen: vi.fn().mockReturnValue(true) });
+        handleWindowClose(mockEvent(), window, { appQuitting: false, hasTray: true });
+        await revealMainWindow(window);
+        leaveFullScreen(window);
+        expect(app.hide).not.toHaveBeenCalled();
+        expect(backgroundToMenuBar).not.toHaveBeenCalled();
+        expect(window.focus).toHaveBeenCalled();
+    });
+
+    it("does not hide after a quit during the fullscreen animation", () => {
+        const window = mockWindow({ isFullScreen: vi.fn().mockReturnValue(true) });
+        handleWindowClose(mockEvent(), window, { appQuitting: false, hasTray: true });
+        global.appQuitting = true;
+        leaveFullScreen(window);
+        expect(app.hide).not.toHaveBeenCalled();
+    });
+
+    it("does not reopen after a newer close while the Dock is being restored", async () => {
+        let finishShow!: () => void;
+        vi.mocked(restoreDock).mockReturnValueOnce(new Promise((resolve) => (finishShow = resolve)));
+        const window = mockWindow();
+        const reveal = revealMainWindow(window);
+        handleWindowClose(mockEvent(), window, { appQuitting: false, hasTray: true });
+        finishShow();
+        await reveal;
+        expect(app.show).not.toHaveBeenCalled();
+        expect(window.focus).not.toHaveBeenCalled();
     });
 });

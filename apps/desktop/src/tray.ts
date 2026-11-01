@@ -17,17 +17,33 @@ import { _t } from "./language-helper.js";
 import { getBuildConfig } from "./build-config.js";
 import { getIconPath } from "./icon.js";
 import { getConfig } from "./config.js";
+import { revealMainWindow } from "./window-close.js";
+import { setMenuBarAvailable } from "./macos-dock.js";
 
 // This hardcoded uuid is an arbitrary v4 uuid generated on https://www.uuidgenerator.net/version4
 const UUID_NAMESPACE = "9fc9c6a0-9ffe-45c9-9cd7-5639ae38b232";
 
 let trayIcon: Tray | null = null;
+let trayOperation = Promise.resolve();
+
+function enqueue(operation: () => Promise<void>): Promise<void> {
+    const result = trayOperation.then(operation);
+    // A failed operation must not block later preference changes; the caller gets the failure.
+    trayOperation = result.catch(() => {});
+    return result;
+}
 
 export function hasTray(): boolean {
     return trayIcon !== null;
 }
 
-export function destroy(): void {
+/** Restore the Dock before removing the tray; serialize concurrent preference changes. */
+export function destroy(): Promise<void> {
+    return enqueue(destroyTray);
+}
+
+async function destroyTray(): Promise<void> {
+    await setMenuBarAvailable(false);
     if (trayIcon) {
         trayIcon.destroy();
         trayIcon = null;
@@ -35,20 +51,35 @@ export function destroy(): void {
 }
 
 function toggleWin(): void {
-    if (global.mainWindow?.isVisible() && !global.mainWindow.isMinimized() && global.mainWindow.isFocused()) {
-        global.mainWindow.hide();
+    const window = global.mainWindow;
+    if (!window) return;
+    if (process.platform === "darwin") {
+        // Opening the native menu can take focus away; app.hide() also leaves isVisible() true.
+        if (window.isVisible() && !window.isMinimized() && !app.isHidden()) {
+            window.close();
+        } else {
+            void revealMainWindow(window);
+        }
+    } else if (window.isVisible() && !window.isMinimized() && window.isFocused()) {
+        window.hide();
     } else {
-        if (global.mainWindow?.isMinimized()) global.mainWindow.restore();
-        if (!global.mainWindow?.isVisible()) global.mainWindow?.show();
-        global.mainWindow?.focus();
+        void revealMainWindow(window);
     }
 }
 
-export async function create(): Promise<void> {
-    // no trays on darwin
-    if (process.platform === "darwin" || trayIcon) return;
+/** Create a tray at most once, after any in-flight removal has completed. */
+export function create(): Promise<void> {
+    return enqueue(createTray);
+}
+
+async function createTray(): Promise<void> {
+    if (trayIcon) return;
     const iconPath = await getIconPath();
-    const defaultIcon = nativeImage.createFromPath(iconPath);
+    const defaultIcon = nativeImage.createFromPath(
+        process.platform === "darwin" ? path.join(path.dirname(iconPath), "menubarTemplate.png") : iconPath,
+    );
+    if (defaultIcon.isEmpty()) throw new Error("Tray icon resource is missing");
+    if (process.platform === "darwin") defaultIcon.setTemplateImage(true);
 
     const buildConfig = getBuildConfig();
     if (process.platform === "win32" && app.isPackaged && buildConfig.windowsCertSubjectName) {
@@ -62,9 +93,19 @@ export async function create(): Promise<void> {
         trayIcon = new Tray(defaultIcon);
     }
 
-    trayIcon.setToolTip(getConfig().brand);
-    initApplicationMenu();
-    trayIcon.on("click", toggleWin);
+    try {
+        trayIcon.setToolTip(getConfig().brand);
+        initApplicationMenu();
+        // macOS opens the native menu on click; also toggling the window would race it.
+        if (process.platform !== "darwin") trayIcon.on("click", toggleWin);
+        await setMenuBarAvailable(true);
+    } catch (error) {
+        await destroyTray();
+        throw error;
+    }
+
+    // Keep the macOS template monochrome instead of replacing it with web favicons.
+    if (process.platform === "darwin") return;
 
     // See also, badge.ts
     let lastFavicon: string | null = null;
