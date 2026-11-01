@@ -10,6 +10,7 @@ import { app } from "electron";
 let menuBarAvailable = false;
 let backgrounded = false;
 let lastHideTime = -Infinity;
+let lastShowTime = -Infinity;
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
 let showing: Promise<void> | undefined;
 
@@ -22,8 +23,8 @@ function hideDockWhenReady(): void {
     cancelScheduledHide();
     if (!menuBarAvailable || !backgrounded || global.appQuitting || showing || !app.dock?.isVisible()) return;
 
-    // Electron ignores dock.hide() calls less than one second apart.
-    const delay = Math.max(0, 1100 - (Date.now() - lastHideTime));
+    // Electron ignores dock.hide() within one second of dock.show().
+    const delay = Math.max(0, 1100 - (Date.now() - Math.max(lastHideTime, lastShowTime)));
     if (delay > 0) {
         hideTimer = setTimeout(hideDockWhenReady, delay);
         return;
@@ -39,6 +40,15 @@ export function backgroundToMenuBar(): void {
     hideDockWhenReady();
 }
 
+async function waitForDockVisible(): Promise<void> {
+    const deadline = Date.now() + 5000;
+    // Electron's inactive-app path resolves dock.show() before the native activation policy changes.
+    while (!global.appQuitting && !app.dock?.isVisible()) {
+        if (Date.now() >= deadline) throw new Error("The Dock did not become visible after being restored");
+        await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    }
+}
+
 /** Restore the Dock and cancel any delayed hide before revealing a window. */
 export async function restoreDock(): Promise<void> {
     if (process.platform !== "darwin") return;
@@ -47,11 +57,15 @@ export async function restoreDock(): Promise<void> {
     if (showing) return showing;
     if (!app.dock || app.dock.isVisible()) return;
 
-    showing = app.dock.show().finally(() => {
-        showing = undefined;
-        // A close can arrive while macOS is asynchronously restoring the Dock.
-        if (backgrounded) hideDockWhenReady();
-    });
+    lastShowTime = Date.now();
+    showing = app.dock
+        .show()
+        .then(waitForDockVisible)
+        .finally(() => {
+            showing = undefined;
+            // A close can arrive while macOS is asynchronously restoring the Dock.
+            if (backgrounded) hideDockWhenReady();
+        });
     return showing;
 }
 
