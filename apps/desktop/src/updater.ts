@@ -13,11 +13,13 @@ import { getSquirrelExecutable } from "./squirrelhooks.js";
 import { _t } from "./language-helper.js";
 import { initialisePromise } from "./ipc.js";
 import { getConfig } from "./config.js";
+import { getBuildConfig } from "./build-config.js";
 
 const UPDATE_POLL_INTERVAL_MS = 60 * 60 * 1000;
 const INITIAL_UPDATE_DELAY_MS = 30 * 1000;
 
 function installUpdate(): void {
+    if (getBuildConfig().manualUpdates) return;
     // for some reason, quitAndInstall does not fire the
     // before-quit event, so we need to set the flag here.
     global.appQuitting = true;
@@ -55,6 +57,10 @@ async function safeCheckForUpdate(): Promise<void> {
 }
 
 async function pollForUpdates(): Promise<void> {
+    if (getBuildConfig().manualUpdates) {
+        ipcChannelSendUpdateStatus(false);
+        return;
+    }
     try {
         // If we've already got a new update downloaded, then stop trying to check for new ones, as according to the doc
         // at https://github.com/electron/electron/blob/main/docs/api/auto-updater.md#autoupdatercheckforupdates
@@ -73,6 +79,7 @@ async function pollForUpdates(): Promise<void> {
 }
 
 export async function start(updateBaseUrl: string): Promise<void> {
+    if (getBuildConfig().manualUpdates) return;
     if (!(await available())) return;
     console.log(`Starting auto update with base URL: ${updateBaseUrl}`);
     if (!updateBaseUrl.endsWith("/")) {
@@ -188,9 +195,11 @@ interface ICachedUpdate {
 let latestUpdateDownloaded: ICachedUpdate | undefined;
 autoUpdater
     .on("update-available", function () {
+        if (getBuildConfig().manualUpdates) return;
         ipcChannelSendUpdateStatus(true);
     })
     .on("update-not-available", function () {
+        if (getBuildConfig().manualUpdates) return;
         if (latestUpdateDownloaded) {
             // the only time we will get `update-not-available` if `latestUpdateDownloaded` is already set
             // is if the user used the Manual Update check and there is no update newer than the one we
@@ -201,10 +210,12 @@ autoUpdater
         }
     })
     .on("error", function (error) {
+        if (getBuildConfig().manualUpdates) return;
         ipcChannelSendUpdateStatus(error.message);
     });
 
 autoUpdater.on("update-downloaded", (ev, releaseNotes, releaseName, releaseDate, updateURL) => {
+    if (getBuildConfig().manualUpdates) return;
     // forward to renderer
     latestUpdateDownloaded = { releaseNotes, releaseName, releaseDate, updateURL };
     global.mainWindow?.webContents.send("update-downloaded", latestUpdateDownloaded);

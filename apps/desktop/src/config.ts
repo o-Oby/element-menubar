@@ -9,6 +9,7 @@ import { app, dialog } from "electron";
 import path from "node:path";
 import { type ResolveDefaults, type DesktopConfigJson, type JsonDocument } from "shared-types";
 
+import { getBuildConfig } from "./build-config.js";
 import { getAsarPath } from "./asar.js";
 import { loadJsonFile } from "./utils.js";
 
@@ -109,6 +110,8 @@ export function loadConfig(localConfigPath: string | undefined): Promise<ConfigO
 
         // Apply defaults again in case the local config had an explicit null/undefined value for required keys.
         applyDefaults(config);
+        // Local configuration must not opt a fork into the official binary update channel.
+        if (getBuildConfig().manualUpdates) delete config.update_base_url;
         return config;
     }
     loadConfigPromise = actuallyLoadConfig();

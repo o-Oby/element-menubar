@@ -16,6 +16,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let buildConfig: BuildConfig;
 
 interface BuildConfig {
+    // Immutable package policy: this variant is updated by rebuilding the fork.
+    manualUpdates: boolean;
     // Application User Model ID
     appId: string;
     // Protocol string used for OIDC callbacks
@@ -29,6 +31,7 @@ export function getBuildConfig(): BuildConfig {
     if (!buildConfig) {
         const packageJson = loadJsonFile(path.join(__dirname, "..", "package.json")) as JsonObject;
         buildConfig = {
+            manualUpdates: packageJson["electron_manual_updates"] === true,
             appId: (packageJson["electron_appId"] as string) || "im.riot.app",
             protocol: (packageJson["electron_protocol"] as string) || "io.element.desktop",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,

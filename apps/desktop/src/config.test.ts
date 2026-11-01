@@ -12,8 +12,11 @@ import { fileURLToPath } from "node:url";
 import { dialog } from "electron";
 
 import { type ConfigOptions } from "./config.js";
+import { getBuildConfig } from "./build-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+vi.mock("./build-config.js", () => ({ getBuildConfig: vi.fn(() => ({ manualUpdates: false })) }));
 
 vi.mock("node:fs", () => ({ default: memfs }));
 vi.mock("node:fs/promises", () => ({ default: memfs.promises }));
@@ -31,6 +34,12 @@ vi.mock("electron", () => ({
 beforeEach(() => {
     // Reset the state of the in-memory fs
     vol.reset();
+    vi.mocked(getBuildConfig).mockReturnValue({
+        manualUpdates: false,
+        appId: "test",
+        protocol: "test",
+        windowsCertSubjectName: undefined,
+    });
 });
 
 describe("loadConfig", () => {
@@ -136,6 +145,29 @@ describe("loadConfig", () => {
         expect(config.web_base_url).toBe("https://chat.org.com");
         expect(config.modules).toStrictEqual(["/webapp/modules/banner", "module2"]);
     });
+
+    it.each([true, false])(
+        "should enforce the packaged update policy after local overrides (%s)",
+        async (manualUpdates) => {
+            vi.mocked(getBuildConfig).mockReturnValue({
+                manualUpdates,
+                appId: "test",
+                protocol: "test",
+                windowsCertSubjectName: undefined,
+            });
+            vol.fromJSON({
+                "/home/custom-config.json": JSON.stringify({
+                    update_base_url: "https://packages.element.io/desktop/update/",
+                    electron_manual_updates: false,
+                }),
+            });
+
+            const config = await loadConfig("/home/custom-config.json");
+            expect(config.update_base_url).toBe(
+                manualUpdates ? undefined : "https://packages.element.io/desktop/update/",
+            );
+        },
+    );
 
     it("should show a dialog when encountering a SyntaxError", async () => {
         vol.fromJSON({
