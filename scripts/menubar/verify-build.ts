@@ -28,7 +28,7 @@ assert.equal(metadata.electron_appId, "io.github.o-oby.element-menubar");
 assert.equal(metadata.electron_protocol, "io.github.o-oby.element-menubar");
 assert.equal(metadata.electron_manual_updates, true);
 assert.equal(metadata.version, release.upstreamTag.slice(1));
-assert.equal(webVersion, metadata.version);
+assert.equal(webVersion.replace(/^v/, ""), metadata.version);
 assert.equal(config.brand, "Element Menu Bar");
 assert.equal(config.update_base_url, undefined);
 for (const image of ["menubarTemplate.png", "menubarTemplate@2x.png"]) {
