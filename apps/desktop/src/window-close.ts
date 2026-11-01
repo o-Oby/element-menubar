@@ -104,5 +104,7 @@ export async function revealMainWindow(window: BrowserWindow): Promise<void> {
     }
     if (!window.isVisible()) window.show();
     if (window.isMinimized()) window.restore();
+    // Restoring a Dock icon does not activate its app; a tray/Finder reopen must take focus explicitly.
+    if (process.platform === "darwin") app.focus({ steal: true });
     window.focus();
 }

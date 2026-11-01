@@ -18,6 +18,7 @@ vi.mock("electron", () => ({
     app: {
         hide: vi.fn(),
         show: vi.fn(),
+        focus: vi.fn(),
     },
 }));
 
@@ -205,6 +206,13 @@ describe("revealMainWindow", () => {
         await revealMainWindow(window);
 
         expect(app.show).toHaveBeenCalled();
+        expect(app.focus).toHaveBeenCalledWith({ steal: true });
+        expect(vi.mocked(app.show).mock.invocationCallOrder[0]).toBeLessThan(
+            vi.mocked(app.focus).mock.invocationCallOrder[0],
+        );
+        expect(vi.mocked(app.focus).mock.invocationCallOrder[0]).toBeLessThan(
+            vi.mocked(window.focus).mock.invocationCallOrder[0],
+        );
         expect(window.focus).toHaveBeenCalled();
     });
 
@@ -215,6 +223,7 @@ describe("revealMainWindow", () => {
         await revealMainWindow(window);
 
         expect(app.show).not.toHaveBeenCalled();
+        expect(app.focus).not.toHaveBeenCalled();
         expect(window.focus).toHaveBeenCalled();
     });
 
@@ -280,10 +289,12 @@ describe("close and reopen races", () => {
         vi.mocked(restoreDock).mockReturnValueOnce(new Promise((resolve) => (finishShow = resolve)));
         const window = mockWindow();
         const reveal = revealMainWindow(window);
+        expect(app.focus).not.toHaveBeenCalled();
         handleWindowClose(mockEvent(), window, { appQuitting: false, hasTray: true });
         finishShow();
         await reveal;
         expect(app.show).not.toHaveBeenCalled();
+        expect(app.focus).not.toHaveBeenCalled();
         expect(window.focus).not.toHaveBeenCalled();
     });
 });
