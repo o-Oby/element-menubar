@@ -1,3 +1,14 @@
+# Element Menu Bar — macOS
+
+Fork personnel d’Element Desktop pour Mac Apple Silicon : barre de menus, Dock masqué à la fermeture,
+et mises à jour manuelles conservant les modifications du fork.
+
+**[Installation et mises à jour](menubar/README.fr.md)** ·
+[Projet officiel](https://github.com/element-hq/element-web) ·
+Branche maintenue : `codex/macos-menubar`.
+
+---
+
 [![Chat](https://img.shields.io/matrix/element-web:matrix.org?logo=matrix)](https://matrix.to/#/#element-web:matrix.org)
 ![Tests](https://github.com/element-hq/element-web/actions/workflows/tests.yaml/badge.svg)
 ![Static Analysis](https://github.com/element-hq/element-web/actions/workflows/static_analysis.yaml/badge.svg)
