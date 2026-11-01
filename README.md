@@ -1,7 +1,8 @@
 # Element Menu Bar — macOS
 
 Fork personnel d’Element Desktop pour Mac Apple Silicon : barre de menus, Dock masqué à la fermeture,
-et mises à jour manuelles conservant les modifications du fork. La variante actuelle remplace
+et mises à jour par double-clic conservant les modifications du fork. Le script sauvegarde l’application et
+son profil, remplace Element, puis le relance via le lanceur Proton existant. La variante actuelle remplace
 `/Applications/Element.app` et réutilise le profil Element existant après sauvegarde.
 
 **[Installation et mises à jour](menubar/README.fr.md)** ·

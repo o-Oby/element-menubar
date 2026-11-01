@@ -48,7 +48,8 @@ pnpm install --filter 'element-desktop...' --frozen-lockfile
 node apps/desktop/node_modules/electron/install.js
 pnpm --dir apps/desktop lint:types
 pnpm --dir apps/desktop exec vitest run --config vitest.config.ts
-node --test scripts/menubar/update.test.ts
+pnpm exec tsc -p scripts/menubar/tsconfig.json
+node --test scripts/menubar/*.test.ts
 
 cache_dir="${ELEMENT_MENUBAR_CACHE_DIR:-$HOME/Library/Caches/ElementMenuBar}"
 mkdir -p "$cache_dir/packages"

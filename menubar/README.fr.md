@@ -12,12 +12,12 @@ Elle remplace `/Applications/Element.app` et réutilise le profil
 La première livraison `v1.12.33-r1`, nommée **Element Menu Bar.app**, était une application séparée :
 ne pas utiliser ce DMG pour ce remplacement.
 
-1. Quitter complètement Element et toute instance d’Element Menu Bar.
-2. Sauvegarder **Element.app** et le dossier complet `~/Library/Application Support/Element`
-   dans un emplacement daté, avant de lancer la nouvelle application.
-3. Ouvrir le DMG `Element-Menu-Bar-<version>-r<révision>-arm64.dmg` livré dans `dist/menubar`,
-   puis copier **Element.app** dans Applications en remplaçant l’ancienne application.
-4. Ouvrir Element et vérifier la reprise de la session, l’accès aux salons chiffrés et les notifications.
+Le script **Mettre à jour Element Menu Bar.command** effectue désormais ce remplacement, la sauvegarde et
+la relance. Il est configuré pour ce Mac Apple Silicon, avec `/Applications/Element.app`, le profil par défaut
+et le lanceur `/Applications/Element (Proton).app` déjà installé.
+
+Pour une installation manuelle, quitter complètement Element, sauvegarder l’application et son profil, puis
+remplacer **Element.app** depuis le DMG. Relancer avec **Element (Proton)** pour conserver les réglages du tunnel.
 
 Le nom `Element` permet de retrouver le profil et le service existant du trousseau macOS.
 La signature du fork étant différente, macOS peut demander à l’utilisateur d’autoriser cet accès.
@@ -46,36 +46,67 @@ pour que son icône puisse disparaître à la fermeture. Le démarrage à l’ou
 
 ## Mettre à jour sans perdre le fork
 
-Fermer l’application n’est nécessaire qu’au moment de remplacer son fichier `.app`.
+Double-cliquer **Mettre à jour Element Menu Bar.command** dans le dossier du projet, puis laisser le terminal
+travailler. Le script :
 
-1. Dans le dossier du projet, double-cliquer **Mettre à jour Element Menu Bar.command**.
-2. Attendre les vérifications et la compilation. Le dossier contenant le DMG s’ouvre à la fin.
-3. Quitter **Element**, sauvegarder l’application et le profil, puis remplacer `/Applications/Element.app`
-   par le nouveau **Element.app** et le rouvrir.
+1. Récupère la dernière version stable officielle et fusionne ses sources avec celles du fork.
+2. Vérifie le client Web signé correspondant, exécute les contrôles et construit le DMG.
+3. Publie les sources validées dans le fork GitHub, puis vérifie le DMG et l’application à installer.
+4. Demande à Element de quitter, puis sauvegarde et vérifie l’application actuelle et son profil complet.
+5. Remplace `/Applications/Element.app`, conserve le profil à sa place et relance **Element (Proton)**.
+6. Vérifie les arguments de lancement du proxy, de résolution DNS et de WebRTC, puis ouvre le dossier du DMG.
 
-Le script récupère la dernière version stable officielle, fusionne ses sources avec la branche du fork,
-vérifie le client Web signé correspondant, exécute les tests et construit le DMG. Il publie la branche du fork
-après validation. Aucun binaire officiel n’est installé automatiquement : le programme de mise à jour interne
-est désactivé pour cette variante, même en présence d’une configuration utilisateur.
+Element peut rester ouvert pendant la compilation. La fermeture intervient au moment de l’installation :
+prévoir la coupure temporaire des conversations et des appels en cours. Si Element affiche une confirmation
+de fermeture, la valider pour poursuivre. Le script attend au maximum 45 secondes et ne force jamais l’arrêt
+d’un processus. En cas d’annulation ou de délai dépassé, il s’arrête avant le remplacement.
 
-Le script de préparation ne déplace ni ne supprime le profil Matrix. Une éventuelle demande macOS d’accès
-au trousseau concerne l’application personnelle qui vient d’être reconstruite. Aucun mot de passe Matrix
-ni clé de récupération n’est nécessaire pour construire ou mettre à jour les sources.
+Les sauvegardes datées se trouvent dans
+`~/Library/Application Support/Element Fork Backups/<date-identifiant>`.
+Chaque sauvegarde contient l’ancienne application, le profil complet et les informations de l’installation.
+Le dossier est privé, accessible uniquement à votre compte. Son emplacement est indiqué dans le terminal ;
+les sauvegardes restent sur ce Mac et ne sont jamais publiées sur GitHub. Elles sont conservées pour permettre
+un retour en arrière et peuvent prendre de la place.
+
+Si la livraison vérifiée est déjà installée, le script évite une nouvelle sauvegarde et un remplacement
+inutile ; il s’assure qu’Element est lancé via Proton. Une livraison déjà construite et encore valide est
+réutilisée. Deux lancements simultanés du script ne peuvent pas installer en parallèle.
+
+Le programme de mise à jour officiel intégré à Element reste désactivé dans cette variante, même en présence
+d’une configuration utilisateur. Les nouvelles versions passent par ce script afin de conserver les modifications
+du fork. Le script n’exporte aucun secret du trousseau et ne réinitialise pas les données Matrix.
+Une éventuelle demande macOS d’accès au trousseau doit être traitée par vous ; aucun mot de passe Matrix
+ni clé de récupération n’est nécessaire pour compiler ou installer la mise à jour.
+
+En cas de réussite, le script se termine. En cas d’erreur, le terminal reste ouvert avec le diagnostic et attend
+Entrée avant de se fermer. Aucun déplacement manuel du fichier `.app` n’est nécessaire lors d’une mise à jour réussie.
 
 Pré-requis : Xcode et ses outils de ligne de commande, Git, GnuPG (`brew install gnupg`) et un accès GitHub
 en écriture au fork (`gh auth setup-git` si nécessaire). Node et pnpm sont téléchargés aux versions prescrites
 par le dépôt dans `~/Library/Caches/ElementMenuBar/toolchains`, sans changer les versions système.
 Les dépendances sont installées avec le fichier de verrouillage officiel.
 
-## Si une préparation échoue
+## Si une mise à jour échoue
 
-Le script ne remplace pas l’application installée. Un conflit avec une nouvelle version nécessite une adaptation
-du fork ; il n’est jamais résolu en écrasant automatiquement nos modifications.
+Un conflit de fusion ou un échec de compilation ne modifie pas l’application installée et ne publie pas une
+nouvelle branche validée. Un conflit nécessite une adaptation du fork ; il n’est jamais résolu en écrasant
+automatiquement nos modifications.
 
 Le terminal indique le dossier de préparation conservé. Ses journaux et son emplacement sont enregistrés dans
-`.git/menubar-updates`. Partager ces diagnostics pour faire corriger le conflit ou l’échec, puis relancer la préparation.
+`.git/menubar-updates`. Partager ces diagnostics pour faire corriger le conflit ou l’échec, puis relancer le script.
 Un échec de publication GitHub conserve aussi la préparation validée. Ne pas utiliser `git reset --hard`,
 un push forcé ou une réinitialisation du profil pour résoudre un problème de préparation.
+
+Une erreur de sauvegarde empêche le remplacement. Si le remplacement échoue avant la relance, le script remet
+l’ancienne application en place. Si la relance ou la vérification Proton échoue, il conserve les sauvegardes et
+le profil actuel et indique le problème : une nouvelle application peut déjà avoir fait évoluer le profil.
+Il ne restaure donc pas automatiquement d’anciennes données par-dessus ce profil.
+
+À ce stade, les sources validées peuvent déjà être publiées sur GitHub et le nouveau DMG reste disponible.
+Corriger le problème signalé, puis double-cliquer à nouveau : le script peut reprendre avec la livraison vérifiée,
+sans reconstruire inutilement. Pour un retour en arrière après lancement, quitter Element, conserver le profil
+actuel à part et restaurer ensemble l’application et le profil de la sauvegarde choisie. Relancer ensuite
+**Element (Proton)**. Ne jamais remplacer un profil pendant qu’Element est en cours d’exécution.
 
 Pour reconstruire explicitement la version courante depuis un dépôt enregistré et propre :
 
@@ -98,7 +129,7 @@ et leurs empreintes SHA-256 sous `dist/menubar`, et vérifie ces empreintes avan
 source scripts/menubar/bootstrap.sh
 menubar_bootstrap
 pnpm --dir apps/desktop exec vitest run --config vitest.config.ts
-node --test scripts/menubar/update.test.ts
+node --test scripts/menubar/*.test.ts
 ```
 
 Le build vérifie également les types TypeScript, l’identité de l’application, le canal manuel, les ressources

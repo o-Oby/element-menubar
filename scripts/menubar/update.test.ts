@@ -160,6 +160,30 @@ void describe("Element Menu Bar source update", () => {
         assert.equal(builds, 2);
     });
 
+    void it("should keep the lock during installation, and retry a failed install using the existing delivery", async () => {
+        const f = fixture();
+        f.options.latestRelease = async () => "v1.0.0";
+        const build = f.options.build!;
+        let builds = 0;
+        let installs = 0;
+        f.options.build = async (...args) => {
+            builds++;
+            await build(...args);
+        };
+        f.options.install = async (directory) => {
+            installs++;
+            assert.ok(fs.existsSync(path.join(directory, "release.json")));
+            assert.ok(fs.existsSync(path.join(f.repository, ".git/menubar-updates/lock")));
+            if (installs === 1) throw new Error("installation failed");
+        };
+        await assert.rejects(runUpdate(f.options), /installation failed/);
+        await runUpdate(f.options);
+        assert.equal(builds, 1);
+        assert.equal(installs, 2);
+        assert.equal(fs.existsSync(path.join(f.repository, ".git/menubar-updates/lock")), false);
+        assertUnchanged(f);
+    });
+
     void it("should create a new fork revision for changed customizations and tolerate unavailable Finder", async () => {
         const f = fixture();
         f.options.latestRelease = async () => "v1.0.0";

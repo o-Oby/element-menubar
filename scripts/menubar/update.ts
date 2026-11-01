@@ -12,6 +12,8 @@ import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
 
+import { installOnMac, preflightMacInstall } from "./install-macos.ts";
+
 const BRANCH = "codex/macos-menubar";
 const RELEASE_FILE = "menubar/release.json";
 const ORIGIN = "https://github.com/o-Oby/element-menubar.git";
@@ -23,6 +25,7 @@ export interface UpdateOptions {
     latestRelease?: () => Promise<string>;
     build?: (candidate: string, logFile: string) => Promise<void>;
     openDirectory?: (directory: string) => void;
+    install?: (directory: string) => Promise<void>;
     log?: (message: string) => void;
     expectedOrigin?: string;
     expectedUpstream?: string;
@@ -211,7 +214,7 @@ function fetchOrigin(repository: string, expectedHead: string): void {
     }
 }
 
-/** Prepare and publish a tested source revision, then expose its DMG without installing or touching app profiles. */
+/** Prepare and publish tested sources; optionally install their DMG while keeping the update lock. */
 export async function runUpdate(options: UpdateOptions): Promise<string> {
     const repository = fs.realpathSync(options.repository);
     if (fs.realpathSync(git(repository, "rev-parse", "--show-toplevel")) !== repository) {
@@ -240,6 +243,18 @@ export async function runUpdate(options: UpdateOptions): Promise<string> {
             log(`Le Finder n’a pas pu être ouvert. La livraison reste disponible dans : ${directory}`);
         }
     };
+    const installPrepared = async (directory: string): Promise<void> => {
+        try {
+            await options.install?.(directory);
+        } catch (error) {
+            const details = error instanceof Error ? error.message : String(error);
+            throw new Error(
+                `${details}\nLa livraison validée reste dans ${directory}. ` +
+                    "Relancez le script pour réessayer son installation sans la reconstruire.",
+                { cause: error },
+            );
+        }
+    };
     let runDir: string | undefined;
     try {
         fs.writeFileSync(
@@ -262,6 +277,7 @@ export async function runUpdate(options: UpdateOptions): Promise<string> {
         if (targetTag === release.upstreamTag && hasValidDelivery(deliveryPath(repository, release), release, head)) {
             const directory = deliveryPath(repository, release);
             log(`La version ${targetTag}, révision ${release.revision}, est déjà préparée.`);
+            await installPrepared(directory);
             showDelivery(directory);
             return directory;
         }
@@ -328,9 +344,8 @@ export async function runUpdate(options: UpdateOptions): Promise<string> {
         git(repository, "worktree", "remove", candidate);
         fs.rmdirSync(workspaceRoot);
         git(repository, "branch", "-d", candidateBranch);
-        log(
-            `Prêt : ${destination}\nQuittez Element, sauvegardez l’application et le profil, puis remplacez /Applications/Element.app depuis le DMG.`,
-        );
+        log(`Livraison validée : ${destination}`);
+        await installPrepared(destination);
         showDelivery(destination);
         return destination;
     } catch (error) {
@@ -346,8 +361,17 @@ export async function runUpdate(options: UpdateOptions): Promise<string> {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    runUpdate({ repository: path.resolve(import.meta.dirname, "../..") }).catch((error: unknown) => {
-        console.error(`\nMise à jour interrompue : ${error instanceof Error ? error.message : String(error)}`);
-        process.exitCode = 1;
-    });
+    const install = process.argv.includes("--install");
+    Promise.resolve()
+        .then(async () => {
+            if (install) preflightMacInstall();
+            await runUpdate({
+                repository: path.resolve(import.meta.dirname, "../.."),
+                install: install ? installOnMac : undefined,
+            });
+        })
+        .catch((error: unknown) => {
+            console.error(`\nMise à jour interrompue : ${error instanceof Error ? error.message : String(error)}`);
+            process.exitCode = 1;
+        });
 }
